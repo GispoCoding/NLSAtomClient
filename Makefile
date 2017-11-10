@@ -46,11 +46,11 @@ PY_FILES = \
 	__init__.py \
 	nls_atom_client.py nls_atom_client_dialog.py
 
-UI_FILES = nls_atom_client_dialog_base.ui
+UI_FILES = nls_atom_client_dialog_base.ui nls_atom_client_dialog_municipality_selection.ui nls_atom_client_dialog_NLS_user_key.ui
 
 EXTRAS = metadata.txt icon.png
 
-EXTRA_DIRS =
+EXTRA_DIRS = data
 
 COMPILED_RESOURCE_FILES = resources.py
 
@@ -113,7 +113,7 @@ deploy: compile doc transcompile
 	cp -vfr i18n $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	cp -vfr $(HELP) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)/help
 	# Copy extra directories if any
-  # (temporarily removed)
+	$(foreach EXTRA_DIR,$(EXTRA_DIRS), cp -R $(EXTRA_DIR) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)/;)
 
 
 # The dclean target removes compiled python files from plugin directory

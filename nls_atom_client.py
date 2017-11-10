@@ -28,6 +28,19 @@ import resources
 from nls_atom_client_dialog import NLSAtomClientDialog
 import os.path
 
+from qgis.core import *
+from qgis.gui import *
+
+from PyQt4 import uic
+
+import xml.etree.ElementTree
+
+import requests
+import zipfile
+import StringIO
+
+NLS_USER_KEY_DIALOG_FILE = "nls_atom_client_dialog_NLS_user_key.ui"
+MUNICIPALITIES_DIALOG_FILE = "nls_atom_client_dialog_municipality_selection.ui"
 
 class NLSAtomClient:
     """QGIS Plugin Implementation."""
@@ -132,9 +145,6 @@ class NLSAtomClient:
         :rtype: QAction
         """
 
-        # Create the dialog (after translation) and keep reference
-        self.dlg = NLSAtomClientDialog()
-
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
@@ -182,12 +192,128 @@ class NLSAtomClient:
 
     def run(self):
         """Run method that performs all the real work"""
+        
+        #TODO
+        # 1. Load the municipality data and the UTM 25LR grid
+        # 2. List municipalities to the user (later also show the selection on the map)
+        # 3. Prompt the API key from the user and store it (later allow changing via the settings)
+        # 4. Let user choose the data sets (later remember selections and allow to create defaults)
+        # 5. Download the type of data chosen by the user (later remember selections) 
+        # 6. Store the data to the disk (later let user choose the storage format)
+        # 7. Add the data as layer(s)
+        
+        #TODO later:
+        # - check if municipality and utm data has been updated and download automatically also letting the user to know
+        # - allow user to load new municipality data and the UTM 25LR grid from NLS server
+        # - allow user to choose, map sheets intersecting or fully inside a municipality or clip the data according to the municipality borders
+        # - store Atom responses locally and just check updates (automatically? / by user request?)
+        # - let the user choose the source data type
+        
+        self.path = os.path.dirname(__file__)
+        #QgsMessageLog.logMessage(self.path,
+        #                         'NLSAtomClient',
+        #                         QgsMessageLog.INFO)
+        
+        self.nls_user_key = QSettings().value("/NLSAtomClient/userKey", "", type=str)
+        if self.nls_user_key == "":
+            self.nls_user_key_dialog = uic.loadUi(os.path.join(self.path, NLS_USER_KEY_DIALOG_FILE))
+            self.nls_user_key_dialog.show()
+            # Run the dialog event loop
+            result = self.nls_user_key_dialog.exec_()
+            # See if OK was pressed
+            if result:
+                self.nls_user_key = self.nls_user_key_dialog.userKeyLineEdit.text()
+                QSettings().setValue("/NLSAtomClient/userKey", self.nls_user_key)
+            else:
+                # TODO cannot work without the key, so user needs to be notified
+                pass
+        
+        self.product_types = self.downloadNLSProductTypes()
+        
+        self.municipality_layer = QgsVectorLayer(os.path.join(self.path, "data/SuomenKuntajako_2017_10k.shp"), "municipalities", "ogr")
+        if not self.municipality_layer.isValid():
+            QgsMessageLog.logMessage('Failed to load the municipality layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
+            self.iface.messageBar().pushMessage("Error", "Failed to load the municipality layer", level=QgsMessageBar.CRITICAL, duration=5)
+        self.municipality_layer.setProviderEncoding('ISO-8859-1')
+        
+        self.utm25lr_layer = QgsVectorLayer(os.path.join(self.path, "data/utm25LR.shp"), "utm25lr", "ogr")
+        if not self.municipality_layer.isValid():
+            QgsMessageLog.logMessage('Failed to load the UTM 25LR grid layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
+            self.iface.messageBar().pushMessage("Error", "Failed to load the UTM 25LR grid layer", level=QgsMessageBar.CRITICAL, duration=5)
+        
+        self.municipalities_dialog = uic.loadUi(os.path.join(self.path, MUNICIPALITIES_DIALOG_FILE))
+        iter = self.municipality_layer.getFeatures()
+        for feature in iter:
+            self.municipalities_dialog.municipalityListWidget.addItem(feature['NAMEFIN'])
+        
+        self.municipalities_dialog.show()
+        
         # show the dialog
-        self.dlg.show()
+        #self.dlg.show()
         # Run the dialog event loop
-        result = self.dlg.exec_()
+        result = self.municipalities_dialog.exec_()
         # See if OK was pressed
         if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+            mun_utm_features = []
+            
+            selected_mun_names = []
+            for item in self.municipalities_dialog.municipalityListWidget.selectedItems():
+                selected_mun_names.append(item.text())
+                
+            QgsMessageLog.logMessage(str(selected_mun_names), 'NLSAtomClient', QgsMessageLog.INFO)
+            
+            for selected_mun_name in selected_mun_names:
+                mun_utm_features = self.getMunicipalityIntersectingUTMFeatures(selected_mun_name)
+            
+                feature_types = ["maastotietokanta"] # TODO ask from the user via dialog that lists types based on NLS Atom service
+                #self.downloadData(mun_utm_features, feature_types)
+
+
+    def getMunicipalityIntersectingUTMFeatures(self, selected_mun_name):
+        mun_utm_features = []
+        request = QgsFeatureRequest().setFilterExpression( u'"NAMEFIN" = \'' + selected_mun_name + u'\'' )
+        #QgsMessageLog.logMessage(municipality_layer.featureCount(request), 'NLSAtomClient', QgsMessageLog.INFO)
+        iter = self.municipality_layer.getFeatures( request )
+        count = 0
+        for feature in iter:
+            count += 1
+            mun_geom = feature.geometry()
+            
+            utm_iter = self.utm25lr_layer.getFeatures()
+            for utm_feature in utm_iter:
+                utm_geom = utm_feature.geometry()
+                if mun_geom.intersects(utm_geom):
+                    mun_utm_features.append(utm_feature)
+            
+        QgsMessageLog.logMessage("Municipalities with the name: " + str(count), 'NLSAtomClient', QgsMessageLog.INFO)
+        QgsMessageLog.logMessage("UTM sheets matching the municipality name: " + str(len(mun_utm_features)), 'NLSAtomClient', QgsMessageLog.INFO)
+
+        return mun_utm_features
+    
+    def downloadData(self, mun_utm_features, feature_types):
+        # TODO show progress to the user
+        # TODO show extracted data as layers in the QGIS if preferred by the user
+        for feature_type in feature_types:
+            for mun_utm_feature in mun_utm_features:
+                sheet_name = mun_utm_feature['LEHTITUNNU']
+                sn1 = sheet_name[:2]
+                sn2 = sheet_name[:3]
+        
+                url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/tilauslataus/tuotteet/" + feature_type + "/kaikki/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+                #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                r = requests.get(url, stream=True)
+                # TODO check r.status_code
+                z = zipfile.ZipFile(StringIO.StringIO(r.content))
+                z.extractall(os.path.join(self.path, "data", feature_type))
+                
+    def downloadNLSProductTypes(self):
+        url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp?api_key=" + self.nls_user_key
+        r = requests.get(url)
+        # TODO parse and read the titles and return them as a list
+        QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        e = xml.etree.ElementTree.fromstring(r.text)
+        
+        
+        
+        
