@@ -229,7 +229,7 @@ class NLSAtomClient:
                 pass
         
         self.product_types = self.downloadNLSProductTypes()
-        
+
         self.municipality_layer = QgsVectorLayer(os.path.join(self.path, "data/SuomenKuntajako_2017_10k.shp"), "municipalities", "ogr")
         if not self.municipality_layer.isValid():
             QgsMessageLog.logMessage('Failed to load the municipality layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
@@ -240,12 +240,15 @@ class NLSAtomClient:
         if not self.municipality_layer.isValid():
             QgsMessageLog.logMessage('Failed to load the UTM 25LR grid layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
             self.iface.messageBar().pushMessage("Error", "Failed to load the UTM 25LR grid layer", level=QgsMessageBar.CRITICAL, duration=5)
-        
+
         self.municipalities_dialog = uic.loadUi(os.path.join(self.path, MUNICIPALITIES_DIALOG_FILE))
         iter = self.municipality_layer.getFeatures()
         for feature in iter:
             self.municipalities_dialog.municipalityListWidget.addItem(feature['NAMEFIN'])
         
+        for key, value in self.product_types.items():
+            self.municipalities_dialog.productListWidget.addItem(value)
+
         self.municipalities_dialog.show()
         
         # show the dialog
@@ -265,8 +268,15 @@ class NLSAtomClient:
             for selected_mun_name in selected_mun_names:
                 mun_utm_features = self.getMunicipalityIntersectingUTMFeatures(selected_mun_name)
             
-                feature_types = ["maastotietokanta"] # TODO ask from the user via dialog that lists types based on NLS Atom service
-                #self.downloadData(mun_utm_features, feature_types)
+            product_type_ids = [] # TODO ask from the user via dialog that lists types based on NLS Atom service  
+
+            for selected_prod_title in self.municipalities_dialog.productListWidget.selectedItems():
+                for key, value in self.product_types.items():
+                    if selected_prod_title.text() == value:
+                        product_type_ids.append(key)
+                    
+                    QgsMessageLog.logMessage(str(product_type_ids), 'NLSAtomClient', QgsMessageLog.INFO)
+                    #self.downloadData(mun_utm_features, product_type_ids)
 
 
     def getMunicipalityIntersectingUTMFeatures(self, selected_mun_name):
@@ -290,16 +300,16 @@ class NLSAtomClient:
 
         return mun_utm_features
     
-    def downloadData(self, mun_utm_features, feature_types):
+    def downloadData(self, mun_utm_features, product_types):
         # TODO show progress to the user
         # TODO show extracted data as layers in the QGIS if preferred by the user
-        for feature_type in feature_types:
+        for key in product_types:
             for mun_utm_feature in mun_utm_features:
                 sheet_name = mun_utm_feature['LEHTITUNNU']
                 sn1 = sheet_name[:2]
                 sn2 = sheet_name[:3]
         
-                url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/tilauslataus/tuotteet/" + feature_type + "/kaikki/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+                url = key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
                 #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
                 r = requests.get(url, stream=True)
                 # TODO check r.status_code
@@ -307,13 +317,25 @@ class NLSAtomClient:
                 z.extractall(os.path.join(self.path, "data", feature_type))
                 
     def downloadNLSProductTypes(self):
+        products = {}
+
         url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp?api_key=" + self.nls_user_key
         r = requests.get(url)
         # TODO parse and read the titles and return them as a list
-        QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+        #QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
         
-        e = xml.etree.ElementTree.fromstring(r.text)
+        e = xml.etree.ElementTree.fromstring(r.text.encode('utf-8'))
         
-        
-        
-        
+        #for child in e:
+            #if child.tag
+            #QgsMessageLog.logMessage(child.tag, 'NLSAtomClient', QgsMessageLog.INFO)
+            #QgsMessageLog.logMessage(child.text, 'NLSAtomClient', QgsMessageLog.INFO)
+
+        for entry in e.findall('{http://www.w3.org/2005/Atom}entry'):
+            title = entry.find('{http://www.w3.org/2005/Atom}title');
+            QgsMessageLog.logMessage(title.text, 'NLSAtomClient', QgsMessageLog.INFO)
+            id = entry.find('{http://www.w3.org/2005/Atom}id')
+            QgsMessageLog.logMessage(id.text, 'NLSAtomClient', QgsMessageLog.INFO)
+            products[id.text] = title.text
+
+        return products
