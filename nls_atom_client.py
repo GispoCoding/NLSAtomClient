@@ -39,6 +39,8 @@ import requests
 import zipfile
 import StringIO
 
+from PyQt4.QtCore import QTimer
+
 NLS_USER_KEY_DIALOG_FILE = "nls_atom_client_dialog_NLS_user_key.ui"
 MUNICIPALITIES_DIALOG_FILE = "nls_atom_client_dialog_municipality_selection.ui"
 
@@ -200,7 +202,7 @@ class NLSAtomClient:
         # 4. Let user choose the data sets (later remember selections and allow to create defaults)
         # 5. Download the type of data chosen by the user (later remember selections) 
         # 6. Store the data to the disk (later let user choose the storage format)
-        # 7. Add the data as layer(s)
+        # 7. Add the data as layer(s) (if user wants)
         
         #TODO later:
         # - check if municipality and utm data has been updated and download automatically also letting the user to know
@@ -268,15 +270,15 @@ class NLSAtomClient:
             for selected_mun_name in selected_mun_names:
                 mun_utm_features = self.getMunicipalityIntersectingUTMFeatures(selected_mun_name)
             
-            product_type_ids = [] # TODO ask from the user via dialog that lists types based on NLS Atom service  
+            product_types = {} # TODO ask from the user via dialog that lists types based on NLS Atom service  
 
             for selected_prod_title in self.municipalities_dialog.productListWidget.selectedItems():
                 for key, value in self.product_types.items():
                     if selected_prod_title.text() == value:
-                        product_type_ids.append(key)
+                        product_types[key] = value
                     
-                    QgsMessageLog.logMessage(str(product_type_ids), 'NLSAtomClient', QgsMessageLog.INFO)
-                    #self.downloadData(mun_utm_features, product_type_ids)
+            QgsMessageLog.logMessage(str(product_types), 'NLSAtomClient', QgsMessageLog.INFO)
+            self.downloadData(mun_utm_features, product_types)
 
 
     def getMunicipalityIntersectingUTMFeatures(self, selected_mun_name):
@@ -303,18 +305,64 @@ class NLSAtomClient:
     def downloadData(self, mun_utm_features, product_types):
         # TODO show progress to the user
         # TODO show extracted data as layers in the QGIS if preferred by the user
-        for key in product_types:
-            for mun_utm_feature in mun_utm_features:
-                sheet_name = mun_utm_feature['LEHTITUNNU']
-                sn1 = sheet_name[:2]
-                sn2 = sheet_name[:3]
         
-                url = key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
-                #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
-                r = requests.get(url, stream=True)
-                # TODO check r.status_code
-                z = zipfile.ZipFile(StringIO.StringIO(r.content))
-                z.extractall(os.path.join(self.path, "data", feature_type))
+        
+        self.total_download_count = len(product_types) * len(mun_utm_features)
+        self.download_count = 0
+        percentage = self.download_count / float(self.total_download_count) * 100.0
+        percentage_text = "%.2f" % round(percentage, 2)
+        
+        self.busy_indicator_dialog = QgsBusyIndicatorDialog("A moment... processed " + percentage_text + "% of the files", self.iface.mainWindow())
+        self.busy_indicator_dialog.show()
+        
+        self.prod_type_key_value_pairs = product_types.items()
+        self.prod_type_counter = 0
+        self.mun_utm_feature_counter = 0
+        self.mun_utm_features = mun_utm_features
+        
+        QTimer.singleShot(10, self.downloadOneFile)
+             
+    def downloadOneFile(self):
+        
+        mun_utm_feature = self.mun_utm_features[self.mun_utm_feature_counter]
+        key, value = self.prod_type_key_value_pairs[self.prod_type_counter]
+        
+        sheet_name = mun_utm_feature['LEHTITUNNU']
+        sn1 = sheet_name[:2]
+        sn2 = sheet_name[:3]
+        
+        modified_key = key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+
+        url = modified_key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+        QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+        r = requests.get(url, stream=True)
+        # TODO check r.status_code
+        #z = zipfile.ZipFile(StringIO.StringIO(r.content))
+        #z.extractall(os.path.join(self.path, "data", value))
+        with open(os.path.join(self.path, "data", value, sheet_name + ".shp.zip"), 'wb') as f:
+            f.write(r.content)
+        
+        self.download_count += 1
+        percentage = self.download_count / float(self.total_download_count) * 100.0
+        percentage_text = "%.2f" % round(percentage, 2)
+        
+        self.busy_indicator_dialog.setMessage("A moment... processed " + percentage_text + "% of the files")
+        #self.iface.messageBar().pushMessage("A moment... processed " + percentage_text + "% of files")
+        QgsMessageLog.logMessage("A moment... processed " + percentage_text + "% of the files", 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        self.mun_utm_feature_counter += 1
+        
+        if self.mun_utm_feature_counter == len(self.mun_utm_features):
+            self.mun_utm_feature_counter = 0
+            self.prod_type_counter += 1
+            
+            if self.prod_type_counter < len(self.prod_type_key_value_pairs):
+                QTimer.singleShot(10, self.downloadOneFile)
+            else:
+                QgsMessageLog.logMessage("done downloading data", 'NLSAtomClient', QgsMessageLog.INFO)
+                self.busy_indicator_dialog.hide()
+        else:
+            QTimer.singleShot(10, self.downloadOneFile)
                 
     def downloadNLSProductTypes(self):
         products = {}
