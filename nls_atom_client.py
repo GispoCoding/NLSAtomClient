@@ -306,40 +306,270 @@ class NLSAtomClient:
         # TODO show progress to the user
         # TODO show extracted data as layers in the QGIS if preferred by the user
         
-        
-        self.total_download_count = len(product_types) * len(mun_utm_features)
+        self.all_urls = []
+        self.total_download_count = 0
         self.download_count = 0
+        
+        for product_key, product_title in product_types.items():
+            urls = self.createDownloadURLS(mun_utm_features, product_key, product_title)
+            self.all_urls.extend(urls)
+            self.total_download_count += len(urls)
+            
         percentage = self.download_count / float(self.total_download_count) * 100.0
         percentage_text = "%.2f" % round(percentage, 2)
-        
+
         self.busy_indicator_dialog = QgsBusyIndicatorDialog("A moment... processed " + percentage_text + "% of the files", self.iface.mainWindow())
         self.busy_indicator_dialog.show()
-        
-        self.prod_type_key_value_pairs = product_types.items()
-        self.prod_type_counter = 0
-        self.mun_utm_feature_counter = 0
-        self.mun_utm_features = mun_utm_features
-        
+            
         QTimer.singleShot(10, self.downloadOneFile)
-             
+
+    def createDownloadURLS(self, mun_utm_features, product_key, product_title):
+        
+        urls = []
+        
+        if product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastotietokanta/kaikki":
+            createTopographicDatabaseDownloadURLS(mun_utm_features, product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiinteistorekisterikartta/karttalehdittain":
+            createCadastralIndexMapVectorAllFeaturesDownloadURLS(mun_utm_features, product_key, product_title)
+        
+        #QgsMessageLog.logMessage("URL count: " + str(len(urls)), 'NLSAtomClient', QgsMessageLog.INFO)
+        return urls
+    
+    def createCadastralIndexMapVectorAllFeaturesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicDatabaseDownloadURLS(self, mun_utm_features, product_key, product_title):
+        
+        urls = []
+        
+        for mun_utm_feature in mun_utm_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+            sn1 = sheet_name[:2]
+            sn2 = sheet_name[:3]
+            
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+    
+            url = modified_key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+    
+            urls.append((url, product_title, product_key))
+            
+        return urls
+
+    def createTopographicMapRaster50kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries20kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+
+    def createBackgroundMapSeries10kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries5kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+
+    def createBasicMapRasterPrintingColorNoAntiAliasingDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBasicMapRasterBackgroundColorDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBasicMapRasterPrintingColorDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createLaserScanningDataPointCloudDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMapRaster8000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMapRaster4500kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMapRaster2000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMapRaster1000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries8000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries4000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+
+    def createBackgroundMapSeries2000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries800kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries320kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries160kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries80kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createBackgroundMapSeries40kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicMapRaster500kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicMapRaster250kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicMapRaster100kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createControlPointsN2000DownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createControlPointsN60DownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createControlPointsTM35FINDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createControlPointsEUREFFINDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createOrthophotoColourInfraDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createOrthophotoColourDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationModel2mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster2mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames50kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames8000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames4500kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames500kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames250kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames100kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames2000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames1000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesMapNames25kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesPlacesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createPlaceNamesPlaceNamesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicDatabaseRoadsWithAddressesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createMunicipalDivision100kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createMunicipalDivision4500kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createMunicipalDivision1000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createMunicipalDivision250kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+
+    def createMunicipalDivision10kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster8000kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster8mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster512mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster128mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster64mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createShadedReliefRaster32mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationModel10mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationZonesRaster512mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationZonesRaster128mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationZonesRaster64mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createElevationZonesRaster32mDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createCadastralIndexMapRasterCadastralIdentifiersDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createCadastralIndexMapRasterCadastralUnitsDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMap1000kAllFeaturesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicMap100kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createGeneralMap4500kAllFeaturesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createTopographicMap250kDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createMapSheetGridAllFeaturesDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+    
+    def createControlPointsLocationDrawingsForControlPointsDownloadURLS(self, mun_utm_features, product_key, product_title):
+        pass
+
     def downloadOneFile(self):
         
-        mun_utm_feature = self.mun_utm_features[self.mun_utm_feature_counter]
-        key, value = self.prod_type_key_value_pairs[self.prod_type_counter]
-        
-        sheet_name = mun_utm_feature['LEHTITUNNU']
-        sn1 = sheet_name[:2]
-        sn2 = sheet_name[:3]
-        
-        modified_key = key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-
-        url = modified_key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+        url = self.all_urls[self.download_count][0]
         QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
         r = requests.get(url, stream=True)
+        
+        url_parts = url.split('/')
+        file_name = url_parts[-1].split('?')[0]
+        
         # TODO check r.status_code
         #z = zipfile.ZipFile(StringIO.StringIO(r.content))
         #z.extractall(os.path.join(self.path, "data", value))
-        with open(os.path.join(self.path, "data", value, sheet_name + ".shp.zip"), 'wb') as f:
+        with open(os.path.join(self.path, "data", self.all_urls[self.download_count][1], file_name), 'wb') as f:
             f.write(r.content)
         
         self.download_count += 1
@@ -350,17 +580,9 @@ class NLSAtomClient:
         #self.iface.messageBar().pushMessage("A moment... processed " + percentage_text + "% of files")
         QgsMessageLog.logMessage("A moment... processed " + percentage_text + "% of the files", 'NLSAtomClient', QgsMessageLog.INFO)
         
-        self.mun_utm_feature_counter += 1
-        
-        if self.mun_utm_feature_counter == len(self.mun_utm_features):
-            self.mun_utm_feature_counter = 0
-            self.prod_type_counter += 1
-            
-            if self.prod_type_counter < len(self.prod_type_key_value_pairs):
-                QTimer.singleShot(10, self.downloadOneFile)
-            else:
-                QgsMessageLog.logMessage("done downloading data", 'NLSAtomClient', QgsMessageLog.INFO)
-                self.busy_indicator_dialog.hide()
+        if self.download_count == self.total_download_count:
+            QgsMessageLog.logMessage("done downloading data", 'NLSAtomClient', QgsMessageLog.INFO)
+            self.busy_indicator_dialog.hide()
         else:
             QTimer.singleShot(10, self.downloadOneFile)
                 
