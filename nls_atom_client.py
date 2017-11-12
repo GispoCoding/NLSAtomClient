@@ -42,6 +42,7 @@ import zipfile
 import StringIO
 
 from PyQt4.QtCore import QTimer
+from sphinx.ext.autosummary import limited_join
 
 NLS_USER_KEY_DIALOG_FILE = "nls_atom_client_dialog_NLS_user_key.ui"
 MUNICIPALITIES_DIALOG_FILE = "nls_atom_client_dialog_municipality_selection.ui"
@@ -212,6 +213,7 @@ class NLSAtomClient:
         # - allow user to choose, map sheets intersecting or fully inside a municipality or clip the data according to the municipality borders
         # - store Atom responses locally and just check updates (automatically? / by user request?)
         # - let the user choose the source data type
+        # - allow to choose download locations
         
         self.path = os.path.dirname(__file__)
         #QgsMessageLog.logMessage(self.path,
@@ -240,6 +242,11 @@ class NLSAtomClient:
             self.iface.messageBar().pushMessage("Error", "Failed to load the municipality layer", level=QgsMessageBar.CRITICAL, duration=5)
         self.municipality_layer.setProviderEncoding('ISO-8859-1')
         
+        self.utm5_layer = QgsVectorLayer(os.path.join(self.path, "data/utm5.shp"), "utm5", "ogr")
+        if not self.utm5_layer.isValid():
+            QgsMessageLog.logMessage('Failed to load the UTM 5 grid layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
+            self.iface.messageBar().pushMessage("Error", "Failed to load the UTM 5 grid layer", level=QgsMessageBar.CRITICAL, duration=5)
+            
         self.utm10_layer = QgsVectorLayer(os.path.join(self.path, "data/utm10.shp"), "utm10", "ogr")
         if not self.utm10_layer.isValid():
             QgsMessageLog.logMessage('Failed to load the UTM 10 grid layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
@@ -275,7 +282,7 @@ class NLSAtomClient:
         for feature in iter:
             self.municipalities_dialog.municipalityListWidget.addItem(feature['NAMEFIN'])
         
-        for key, value in self.product_types.items():
+        for key, value in self.product_types.items():           
             self.municipalities_dialog.productListWidget.addItem(value)
 
         self.municipalities_dialog.show()
@@ -286,6 +293,7 @@ class NLSAtomClient:
         result = self.municipalities_dialog.exec_()
         # See if OK was pressed
         if result:
+            self.mun_utm5_features = []
             self.mun_utm10_features = []
             self.mun_utm25lr_features = []
             self.mun_utm25_features = []
@@ -300,9 +308,10 @@ class NLSAtomClient:
             QgsMessageLog.logMessage(str(selected_mun_names), 'NLSAtomClient', QgsMessageLog.INFO)
             
             for selected_mun_name in selected_mun_names:
-                self.mun_utm25lr_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm25lr_layer)
-                self.mun_utm25_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm25lr_layer)
+                self.mun_utm5_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm5_layer)
                 self.mun_utm10_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm10_layer)
+                self.mun_utm25lr_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm25lr_layer)
+                self.mun_utm25_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm25_layer)
                 self.mun_utm50_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm50_layer)
                 self.mun_utm100_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm100_layer)
                 self.mun_utm200_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm200_layer)
@@ -334,7 +343,7 @@ class NLSAtomClient:
                     intersecting_features.append(layer_feature)
             
         QgsMessageLog.logMessage("Municipalities with the name " + selected_mun_name + ": " + str(count), 'NLSAtomClient', QgsMessageLog.INFO)
-        QgsMessageLog.logMessage("Count of sheets (features) intersecting with the municipality: " + str(len(intersecting_features)), 'NLSAtomClient', QgsMessageLog.INFO)
+        QgsMessageLog.logMessage("Count of " + layer.name() + " sheets (features) intersecting with the municipality: " + str(len(intersecting_features)), 'NLSAtomClient', QgsMessageLog.INFO)
 
         return intersecting_features
     
@@ -368,8 +377,141 @@ class NLSAtomClient:
         elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastotietokanta/kaikki":
             urls = self.createTopographicDatabaseDownloadURLS(product_key, product_title)
         elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokarttarasteri_50k_jhs180/painovari":
-            urls = createTopographicMapRaster50kDownloadURLS(product_key, product_title)
-        
+            urls = self.createTopographicMapRaster50kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_20k":
+            urls = self.createBackgroundMapSeries20kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_10k":
+            urls = self.createBackgroundMapSeries10kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_5k":
+            urls = self.createBackgroundMapSeries5kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/peruskarttarasteri_jhs180/painovari_ei_pehmennysta":
+            urls = self.createBasicMapRasterPrintingColorNoAntiAliasingDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/peruskarttarasteri_jhs180/taustavari_korkeuskayrilla":
+            urls = self.createBasicMapRasterBackgroundColorDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/peruskarttarasteri_jhs180/painovari":
+            urls = self.createBasicMapRasterPrintingColorDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000":
+            urls = self.createLaserScanningDataPointCloudDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskarttarasteri_8000k_jhs180/kaikki":
+            urls = self.createGeneralMapRaster8000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskarttarasteri_4500k_jhs180/kaikki":
+            urls = self.createGeneralMapRaster4500kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskarttarasteri_2000k_jhs180/kaikki":
+            urls = self.createGeneralMapRaster2000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskarttarasteri_1000k_jhs180/kaikki":
+            urls = self.createGeneralMapRaster1000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_8m":
+            urls = self.createBackgroundMapSeries8000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_4m":
+            urls = self.createBackgroundMapSeries4000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_2m":
+            urls = self.createBackgroundMapSeries2000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_800k":
+            urls = self.createBackgroundMapSeries800kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_320k":
+            urls = self.createBackgroundMapSeries320kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_160k":
+            urls = self.createBackgroundMapSeries160kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_80k":
+            urls = self.createBackgroundMapSeries80kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/taustakarttasarja_jhs180/taustakartta_40k":
+            urls = self.createBackgroundMapSeries40kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokarttarasteri_500k_jhs180/kaikki":
+            urls = self.createTopographicMapRaster500kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokarttarasteri_250k_jhs180/kaikki":
+            urls = self.createTopographicMapRaster250kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokarttarasteri_100k_jhs180/kaikki":
+            urls = self.createTopographicMapRaster100kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiintopisterekisteri/korkeuskiintopisteet_n2000":
+            urls = self.createControlPointsN2000DownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiintopisterekisteri/korkeuskiintopisteet_n60":
+            urls = self.createControlPointsN60DownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiintopisterekisteri/tasokiintopisteet_etrs_tm35fin":
+            urls = self.createControlPointsTM35FINDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiintopisterekisteri/maantieteelliset_euref_fin":
+            urls = self.createControlPointsEUREFFINDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva":
+            urls = self.createOrthophotoColourInfraDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/ortokuva":
+            urls = self.createOrthophotoColourDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusmalli/hila_2m":
+            urls = self.createElevationModel2mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_2m":
+            urls = self.createShadedReliefRaster2mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_50":
+            urls = self.createPlaceNamesMapNames50kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_8000":
+            urls = self.createPlaceNamesMapNames8000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_4500":
+            urls = self.createPlaceNamesMapNames4500kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_500":
+            urls = self.createPlaceNamesMapNames500kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_250":
+            urls = self.createPlaceNamesMapNames250kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_100":
+            urls = self.createPlaceNamesMapNames100kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_2000":
+            urls = self.createPlaceNamesMapNames2000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_1000":
+            urls = self.createPlaceNamesMapNames1000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_25":
+            urls = self.createPlaceNamesMapNames25kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/paikat":
+            urls = self.createPlaceNamesPlacesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/paikannimet_kaikki":
+            urls = self.createPlaceNamesPlaceNamesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastotietokanta/tiesto_osoitteilla":
+            urls = self.createTopographicDatabaseRoadsWithAddressesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kuntajako/kuntajako_100k":
+            urls = self.createMunicipalDivision100kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kuntajako/kuntajako_4500k":
+            urls = self.createMunicipalDivision4500kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kuntajako/kuntajako_1000k":
+            urls = self.createMunicipalDivision1000kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kuntajako/kuntajako_250k":
+            urls = self.createMunicipalDivision250kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kuntajako/kuntajako_10k":
+            urls = self.createMunicipalDivision10kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_8m":
+            urls = self.createShadedReliefRaster8mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_512m":
+            urls = self.createShadedReliefRaster512mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_128m":
+            urls = self.createShadedReliefRaster128mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_64m":
+            urls = self.createShadedReliefRaster64mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/vinovalovarjoste/hila_32m":
+            urls = self.createShadedReliefRaster32mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusmalli/hila_10m":
+            urls = self.createElevationModel10mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusvyohyke/hila_512m":
+            urls = self.createElevationZonesRaster512mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusvyohyke/hila_128m":
+            urls = self.createElevationZonesRaster128mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusvyohyke/hila_64m":
+            urls = self.createElevationZonesRaster64mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/korkeusvyohyke/hila_32m":
+            urls = self.createElevationZonesRaster32mDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiinteistorekisterikartta/ktj_kiinteistotunnukset":
+            urls = self.createCadastralIndexMapRasterCadastralIdentifiersDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiinteistorekisterikartta/ktj_kiinteistorajat":
+            urls = self.createCadastralIndexMapRasterCadastralUnitsDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskartta_1000k/kaikki":
+            urls = self.createGeneralMap1000kAllFeaturesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokartta_100k/kaikki":
+            urls = self.createTopographicMap100kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/yleiskartta_4500k/kaikki":
+            urls = self.createGeneralMap4500kAllFeaturesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastokartta_250k/kaikki":
+            urls = self.createTopographicMap250kDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/karttalehtijako_ruudukko/kaikki":
+            urls = self.createMapSheetGridAllFeaturesDownloadURLS(product_key, product_title)
+        elif product_key == "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/kiintopisterekisteri/sijaintipiirrokset":
+            urls = self.createControlPointsLocationDrawingsForControlPointsDownloadURLS(product_key, product_title)
+        else:
+            QgsMessageLog.logMessage('Unknown product ' + product_title +  ', please send error report to the author', 'NLSAtomClient', QgsMessageLog.CRITICAL)
+            self.iface.messageBar().pushMessage('Unknown product ' + product_title +  ', please send error report to the author', level=QgsMessageBar.CRITICAL, duration=10)
+            
         #QgsMessageLog.logMessage("URL count: " + str(len(urls)), 'NLSAtomClient', QgsMessageLog.INFO)
         return urls
     
@@ -525,10 +667,46 @@ class NLSAtomClient:
             urls.append((url, product_title, product_key))
             
         return urls
-    
+ 
     def createLaserScanningDataPointCloudDownloadURLS(self, product_key, product_title):
-        # TODO
-        pass
+        urls = []
+        
+        limit = 1000
+        offset = 0
+        
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000?" + "limit=" + str(limit) + "&offset=" + str(offset) + "&api_key=" + self.nls_user_key
+        QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        while product_url is not "":
+            r = requests.get(product_url)
+            #QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+            
+            e = xml.etree.ElementTree.fromstring(r.text.encode('utf-8'))
+    
+            for entry in e.findall('{http://www.w3.org/2005/Atom}entry'):
+                link = entry.find('{http://www.w3.org/2005/Atom}link')
+                url = link.attrib["href"]
+                #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+                for mun_utm_feature in self.mun_utm5_features:
+                    sheet_name = mun_utm_feature['LEHTITUNNU']
+                
+                    if sheet_name in url:
+                        urls.append((url, product_title, product_key))
+                        #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+            next_link = e.find('{http://www.w3.org/2005/Atom}link[@rel="next"]')
+            #QgsMessageLog.logMessage(str(next_link), 'NLSAtomClient', QgsMessageLog.INFO)
+            if next_link is not None:
+                next_link_href = next_link.attrib["href"]
+                #QgsMessageLog.logMessage(next_link_href, 'NLSAtomClient', QgsMessageLog.INFO)
+                product_url = next_link_href
+                QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+            else:
+                product_url = ""
+                #QgsMessageLog.logMessage("did not find link with rel next", 'NLSAtomClient', QgsMessageLog.INFO)
+            
+        return urls
     
     def createGeneralMapRaster8000kDownloadURLS(self, product_key, product_title):
         urls = []
@@ -655,43 +833,38 @@ class NLSAtomClient:
 
 
     def createBackgroundMapSeries80kDownloadURLS(self, product_key, product_title):
-        pass
-    #===========================================================================
-    #     urls = []
-    #     
-    #     for mun_utm_feature in self.mun_utm100_features:
-    #         sheet_name = mun_utm_feature['LEHTITUNNU']
-    #                     
-    #         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    # 
-    #         url = modified_key + "/16m/etrs89/png/" + sheet_name + ".png?api_key="  + self.nls_user_key
-    #         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
-    # 
-    #         urls.append((url, product_title, product_key))
-    #         
-    #     return urls
-    #===========================================================================
+        urls = []
+         
+        for mun_utm_feature in self.mun_utm200_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+                         
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+     
+            url = modified_key + "/16m/etrs89/png/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key))
+            url = modified_key + "/16m/etrs89/png/" + sheet_name + "R.png?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)     
+            urls.append((url, product_title, product_key))
+             
+        return urls
     
     def createBackgroundMapSeries40kDownloadURLS(self, product_key, product_title):
-        pass
-    #===========================================================================
-    #     urls = []
-    #     
-    #     for mun_utm_feature in self.mun_utm100_features:
-    #         sheet_name = mun_utm_feature['LEHTITUNNU']
-    #         sn1 = sheet_name[:2]
-    #         sn2 = sheet_name[:3]
-    #                     
-    #         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    # 
-    #         url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
-    #         url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
-    #         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
-    # 
-    #         urls.append((url, product_title, product_key))
-    #         
-    #     return urls
-    #===========================================================================
+        urls = []
+         
+        for mun_utm_feature in self.mun_utm100_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+            sn1 = sheet_name[:2]
+            sn2 = sheet_name[:3]
+                         
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+     
+            url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key))
+            url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+            urls.append((url, product_title, product_key))
+             
+        return urls
     
     def createTopographicMapRaster500kDownloadURLS(self, product_key, product_title):
         urls = []
@@ -709,10 +882,39 @@ class NLSAtomClient:
         return urls
     
     def createTopographicMapRaster250kDownloadURLS(self, product_key, product_title):
-        pass
-    
+        urls = []
+         
+        for mun_utm_feature in self.mun_utm200_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+            sn1 = sheet_name[:2]
+                         
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+     
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1 + "L/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key))
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1 + "R/" + sheet_name + "R.png?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)     
+            urls.append((url, product_title, product_key))
+             
+        return urls
+
     def createTopographicMapRaster100kDownloadURLS(self, product_key, product_title):
-        pass
+        urls = []
+         
+        for mun_utm_feature in self.mun_utm100_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+            sn1 = sheet_name[:2]
+            sn2 = sheet_name[:3]
+                         
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+     
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key))
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+            urls.append((url, product_title, product_key))
+             
+        return urls
     
     def createControlPointsN2000DownloadURLS(self, product_key, product_title):
         urls = []
@@ -763,10 +965,84 @@ class NLSAtomClient:
         return urls
     
     def createOrthophotoColourInfraDownloadURLS(self, product_key, product_title):
-        pass
+        urls = []
+        
+        limit = 1000
+        offset = 0
+        
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva?" + "limit=" + str(limit) + "&offset=" + str(offset) + "&api_key=" + self.nls_user_key
+        QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        while product_url is not "":
+            r = requests.get(product_url)
+            #QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+            
+            e = xml.etree.ElementTree.fromstring(r.text.encode('utf-8'))
+    
+            for entry in e.findall('{http://www.w3.org/2005/Atom}entry'):
+                link = entry.find('{http://www.w3.org/2005/Atom}link')
+                url = link.attrib["href"]
+                #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+                for mun_utm_feature in self.mun_utm5_features:
+                    sheet_name = mun_utm_feature['LEHTITUNNU']
+                
+                    if sheet_name in url:
+                        urls.append((url, product_title, product_key))
+                        #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+            next_link = e.find('{http://www.w3.org/2005/Atom}link[@rel="next"]')
+            #QgsMessageLog.logMessage(str(next_link), 'NLSAtomClient', QgsMessageLog.INFO)
+            if next_link is not None:
+                next_link_href = next_link.attrib["href"]
+                #QgsMessageLog.logMessage(next_link_href, 'NLSAtomClient', QgsMessageLog.INFO)
+                product_url = next_link_href
+                QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+            else:
+                product_url = ""
+                #QgsMessageLog.logMessage("did not find link with rel next", 'NLSAtomClient', QgsMessageLog.INFO)
+            
+        return urls
     
     def createOrthophotoColourDownloadURLS(self, product_key, product_title):
-        pass
+        urls = []
+        
+        limit = 1000
+        offset = 0
+        
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/ortokuva?" + "limit=" + str(limit) + "&offset=" + str(offset) + "&api_key=" + self.nls_user_key
+        QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        while product_url is not "":
+            r = requests.get(product_url)
+            #QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+            
+            e = xml.etree.ElementTree.fromstring(r.text.encode('utf-8'))
+    
+            for entry in e.findall('{http://www.w3.org/2005/Atom}entry'):
+                link = entry.find('{http://www.w3.org/2005/Atom}link')
+                url = link.attrib["href"]
+                #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+                for mun_utm_feature in self.mun_utm5_features:
+                    sheet_name = mun_utm_feature['LEHTITUNNU']
+                
+                    if sheet_name in url:
+                        urls.append((url, product_title, product_key))
+                        #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+                
+            next_link = e.find('{http://www.w3.org/2005/Atom}link[@rel="next"]')
+            #QgsMessageLog.logMessage(str(next_link), 'NLSAtomClient', QgsMessageLog.INFO)
+            if next_link is not None:
+                next_link_href = next_link.attrib["href"]
+                #QgsMessageLog.logMessage(next_link_href, 'NLSAtomClient', QgsMessageLog.INFO)
+                product_url = next_link_href
+                QgsMessageLog.logMessage(product_url, 'NLSAtomClient', QgsMessageLog.INFO)
+            else:
+                product_url = ""
+                #QgsMessageLog.logMessage("did not find link with rel next", 'NLSAtomClient', QgsMessageLog.INFO)
+            
+        return urls
     
     def createElevationModel2mDownloadURLS(self, product_key, product_title):
         urls = []
@@ -802,38 +1078,65 @@ class NLSAtomClient:
             
         return urls
     
+    def createPlaceNamesDownloadURLS(self, product_url, product_key, product_title):
+        urls = []
+        
+        r = requests.get(product_url)
+        #QgsMessageLog.logMessage(r.text, 'NLSAtomClient', QgsMessageLog.INFO)
+        
+        e = xml.etree.ElementTree.fromstring(r.text.encode('utf-8'))
+
+        for entry in e.findall('{http://www.w3.org/2005/Atom}entry'):
+            link = entry.find('{http://www.w3.org/2005/Atom}link')
+            url = link.attrib["href"]
+            QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
+            urls.append((url, product_title, product_key))
+            
+        return urls
+    
     def createPlaceNamesMapNames50kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_50?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames8000kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_8000?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames4500kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_4500?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames500kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_500?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames250kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_250?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames100kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_100?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames2000kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_2000?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames1000kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_1000?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesMapNames25kDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/karttanimet_25?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesPlacesDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/paikat?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createPlaceNamesPlaceNamesDownloadURLS(self, product_key, product_title):
-        pass
+        product_url = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/nimisto/paikannimet_kaikki?api_key=" + self.nls_user_key
+        return self.createPlaceNamesDownloadURLS(product_url, product_key, product_title)
     
     def createTopographicDatabaseRoadsWithAddressesDownloadURLS(self, product_key, product_title):
         urls = []
@@ -1132,7 +1435,21 @@ class NLSAtomClient:
         return urls
     
     def createTopographicMap250kDownloadURLS(self, product_key, product_title):
-        pass
+        urls = []
+         
+        for mun_utm_feature in self.mun_utm200_features:
+            sheet_name = mun_utm_feature['LEHTITUNNU']
+            sn1 = sheet_name[:2]
+                         
+            modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
+     
+            url = modified_key + "/etrs89/shp/" + "/" + sn1 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key))
+            url = modified_key + "/etrs89/shp/" + "/" + sn1 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
+            #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)     
+            urls.append((url, product_title, product_key))
+             
+        return urls
     
     def createMapSheetGridAllFeaturesDownloadURLS(self, product_key, product_title):
         urls = []
