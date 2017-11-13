@@ -2,14 +2,22 @@
 <ui version="4.0">
  <class>Dialog</class>
  <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>409</width>
+    <height>455</height>
+   </rect>
+  </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Settings</string>
   </property>
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>30</x>
-     <y>240</y>
+     <x>60</x>
+     <y>420</y>
      <width>341</width>
      <height>32</height>
     </rect>
@@ -26,15 +34,15 @@
     <rect>
      <x>-1</x>
      <y>-1</y>
-     <width>391</width>
-     <height>231</height>
+     <width>411</width>
+     <height>401</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
      <widget class="QLabel" name="label">
       <property name="text">
-       <string>Please, input your NLS.fi open data file updating service user-specific identification key. If you do not have one, you can obtain it via http://www.maanmittauslaitos.fi/en/e-services/open-data-file-download-service/open-data-file-updating-service-interface</string>
+       <string>Please, input your NLS.fi open data file updating service user-specific identification key. If you do not have one, you can obtain it via http://www.maanmittauslaitos.fi/en/e-services/open-data-file-download-service/open-data-file-updating-service-interface.</string>
       </property>
       <property name="wordWrap">
        <bool>true</bool>
@@ -54,9 +62,60 @@
     <item>
      <widget class="QLineEdit" name="userKeyLineEdit"/>
     </item>
+    <item>
+     <widget class="QLabel" name="label_3">
+      <property name="text">
+       <string>Location to save the downloaded NLS data:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QgsFileWidget" name="dataLocationQgsFileWidget"/>
+    </item>
+    <item>
+     <widget class="QLabel" name="label_4">
+      <property name="text">
+       <string>By downloading and using the NLS.fi open data you approve to their National Land Survey open data CC 4.0 licence: http://www.maanmittauslaitos.fi/en/opendata-licence-cc40.</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="addDownloadedDataAsLayerCheckBox">
+      <property name="text">
+       <string>Add downloaded data as layer(s) to QGIS</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="showMunicipalitiesAsLayerCheckBox">
+      <property name="text">
+       <string>Show muncipalities as a layer in QGIS</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="showUTMGridsAsLayerCheckBox">
+      <property name="text">
+       <string>Show UTM grids as layers in QGIS</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsFileWidget</class>
+   <extends>QWidget</extends>
+   <header>qgsfilewidget.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>
