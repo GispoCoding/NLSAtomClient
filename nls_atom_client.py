@@ -44,7 +44,8 @@ import zipfile
 import StringIO
 
 from PyQt4.QtCore import QTimer
-from future.backports.xmlrpc.client import boolean
+
+from osgeo import ogr
 
 NLS_USER_KEY_DIALOG_FILE = "nls_atom_client_dialog_NLS_user_key.ui"
 MUNICIPALITIES_DIALOG_FILE = "nls_atom_client_dialog_municipality_selection.ui"
@@ -226,6 +227,7 @@ class NLSAtomClient:
         self.nls_user_key = QSettings().value("/NLSAtomClient/userKey", "", type=str)
         self.data_download_dir = QSettings().value("/NLSAtomClient/dataDownloadDir", "", type=str)
         self.addDownloadedDataAsLayer = QSettings().value("/NLSAtomClient/addDownloadedDataAsLayer", True, type=bool)
+        self.maxNumberOfLayersToAdd = QSettings().value("/NLSAtomClient/maxNumberOfLayersToAdd", 100, type=int)
         self.showMunicipalitiesAsLayer = QSettings().value("/NLSAtomClient/showMunicipalitiesAsLayer", True, type=bool)
         self.showUTMGridsAsLayer = QSettings().value("/NLSAtomClient/showUTMGridsAsLayer", False, type=bool)
         
@@ -368,6 +370,10 @@ class NLSAtomClient:
             QgsMessageLog.logMessage(str(product_types), 'NLSAtomClient', QgsMessageLog.INFO)
             
             if len(selected_mun_names) > 0 and len(product_types) > 0:
+                self.busy_indicator_dialog = QgsBusyIndicatorDialog(self.tr(u'A moment... processed 0% of the files '), self.iface.mainWindow())
+                self.busy_indicator_dialog.show()
+                QCoreApplication.processEvents()
+                
                 for selected_mun_name in selected_mun_names:
                     if 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000' in product_types or \
                         'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva' in product_types or \
@@ -410,6 +416,7 @@ class NLSAtomClient:
         self.all_urls = []
         self.total_download_count = 0
         self.download_count = 0
+        self.layers_added_count = 0
         
         for product_key, product_title in product_types.items():
             urls = self.createDownloadURLS(product_key, product_title)
@@ -419,8 +426,6 @@ class NLSAtomClient:
         percentage = self.download_count / float(self.total_download_count) * 100.0
         percentage_text = "%.2f" % round(percentage, 2)
 
-        self.busy_indicator_dialog = QgsBusyIndicatorDialog("A moment... processed " + percentage_text + "% of the files ", self.iface.mainWindow())
-        self.busy_indicator_dialog.show()
         QgsMessageLog.logMessage("A moment... processed " + percentage_text + "% of the files", 'NLSAtomClient', QgsMessageLog.INFO)
         #QgsMessageLog.logMessage(str(self.total_download_count), 'NLSAtomClient', QgsMessageLog.INFO)
             
@@ -597,13 +602,13 @@ class NLSAtomClient:
             sheet_name = mun_utm_feature['LEHTITUNNU']
             sn1 = sheet_name[:2]
             sn2 = sheet_name[:3]
-            
+            #https://tiedostopalvelu.maanmittauslaitos.fi/tp/tilauslataus/tuotteet/maastotietokanta/kaikki/etrs89/gml/L4/L41/L4134L_mtk.zip?token=vk2mphnnvbtrp313ee4amjpo2o
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
     
-            url = modified_key + "/etrs89/shp/" + sn1 + "/" + sn2 + "/" + sheet_name + ".shp.zip?api_key="  + self.nls_user_key
+            url = modified_key + "/etrs89/gml/" + sn1 + "/" + sn2 + "/" + sheet_name + "_mtk.zip?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
-            urls.append((url, product_title, product_key, "shp"))
+            urls.append((url, product_title, product_key, "gml"))
             
         return urls
 
@@ -616,7 +621,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/4m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/4m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -633,7 +639,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/4m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/4m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -650,7 +657,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/2m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/2m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -667,7 +675,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/0_5m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/0_5m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -684,7 +693,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -701,7 +711,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -718,7 +729,8 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/1m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -770,7 +782,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/etrs89/png/Yleiskarttarasteri_8milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/etrs89/png/Yleiskarttarasteri_8milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -782,7 +795,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/etrs89/png/Yleiskarttarasteri_45milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/etrs89/png/Yleiskarttarasteri_45milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -794,7 +808,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/etrs89/png/Yleiskarttarasteri_2milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/etrs89/png/Yleiskarttarasteri_2milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -806,8 +821,9 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
-        url = modified_key + "/kaikki/etrs89/png/Yleiskarttarasteri_1milj.png?api_key="  + self.nls_user_key
+        url = modified_key + "/etrs89/png/Yleiskarttarasteri_1milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
+        url = modified_key + "/etrs89/png/Yleiskarttarasteri_1milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
         urls.append((url, product_title, product_key, "png"))
@@ -818,7 +834,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/2048m/etrs89/png/Taustakartta_8milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/2048m/etrs89/png/Taustakartta_8milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -830,7 +847,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/1024m/etrs89/png/Taustakartta_4milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/1024m/etrs89/png/Taustakartta_4milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -842,7 +860,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/256m/etrs89/png/Taustakartta_2milj.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/256m/etrs89/png/Taustakartta_2milj.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -854,7 +873,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/128m/etrs89/png/Taustakartta_800.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/128m/etrs89/png/Taustakartta_800.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -866,7 +886,8 @@ class NLSAtomClient:
         urls = []
         
         modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+        url = modified_key + "/64m/etrs89/png/Taustakartta_320.pgw?api_key="  + self.nls_user_key
+        urls.append((url, product_title, product_key, "pgw"))
         url = modified_key + "/64m/etrs89/png/Taustakartta_320.png?api_key="  + self.nls_user_key
         #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -881,7 +902,8 @@ class NLSAtomClient:
             sheet_name = mun_utm_feature['LEHTITUNNU']
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/32m/etrs89/png/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/32m/etrs89/png/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -898,8 +920,12 @@ class NLSAtomClient:
                          
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
      
+            url = modified_key + "/16m/etrs89/png/" + sheet_name + "L.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/16m/etrs89/png/" + sheet_name + "L.png?api_key="  + self.nls_user_key
             urls.append((url, product_title, product_key, "png"))
+            url = modified_key + "/16m/etrs89/png/" + sheet_name + "R.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/16m/etrs89/png/" + sheet_name + "R.png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)     
             urls.append((url, product_title, product_key, "png"))
@@ -915,9 +941,12 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                          
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-     
+            url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
             urls.append((url, product_title, product_key, "png"))
+            url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/8m/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
             urls.append((url, product_title, product_key, "png"))
@@ -931,7 +960,8 @@ class NLSAtomClient:
             sheet_name = mun_utm_feature['LEHTITUNNU']
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-    
+            url = modified_key + "/etrs89/png/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/etrs89/png/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
@@ -947,9 +977,12 @@ class NLSAtomClient:
             sn1 = sheet_name[:2]
                          
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-     
-            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1 + "L/" + sheet_name + "L.png?api_key="  + self.nls_user_key
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1+ "L/" + sheet_name + "L.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1+ "L/" + sheet_name + "L.png?api_key="  + self.nls_user_key
             urls.append((url, product_title, product_key, "png"))
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1 + "R/" + sheet_name + "R.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/etrs89/png/" + sn1 + "/" + sn1 + "R/" + sheet_name + "R.png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)     
             urls.append((url, product_title, product_key, "png"))
@@ -965,9 +998,12 @@ class NLSAtomClient:
             sn2 = sheet_name[:3]
                          
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
-     
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "L.png?api_key="  + self.nls_user_key
             urls.append((url, product_title, product_key, "png"))
+            url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
             url = modified_key + "/etrs89/png/" + sn1 + "/" + sn2 + "/" + sheet_name + "R.png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
             urls.append((url, product_title, product_key, "png"))
@@ -1108,11 +1144,11 @@ class NLSAtomClient:
         for mun_utm_feature in self.mun_utm10_features:
             sheet_name = mun_utm_feature['LEHTITUNNU']
             sn1 = sheet_name[:2]
-            sn1 = sheet_name[:3]
+            sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
     
-            url = modified_key + "/etrs-tm35fin-n2000/" + sn1 + "/" + sn2 + "/" + sheet_name + ".zip?api_key="  + self.nls_user_key
+            url = modified_key + "/etrs-tm35fin-n2000/" + sn1 + "/" + sn2 + "/" + sheet_name + ".tif?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
             urls.append((url, product_title, product_key, "geotiff"))
@@ -1125,7 +1161,7 @@ class NLSAtomClient:
         for mun_utm_feature in self.mun_utm10_features:
             sheet_name = mun_utm_feature['LEHTITUNNU']
             sn1 = sheet_name[:2]
-            sn1 = sheet_name[:3]
+            sn2 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp", "/tilauslataus/tuotteet")
     
@@ -1428,11 +1464,12 @@ class NLSAtomClient:
             sn1 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp/kiinteistorekisterikartta/ktj_kiinteistotunnukset", "/tilauslataus/tuotteet/kiinteistorekisterikartta/avoin/karttalehdittain/tm35fin/png/ktj_kiinteistotunnukset")
-    
-            url = modified_key + "/" + sn1 + "/" + sheet_name + ".tif?api_key="  + self.nls_user_key
+            url = modified_key + "/" + sn1 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
+            url = modified_key + "/" + sn1 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
-            urls.append((url, product_title, product_key, "geotiff"))
+            urls.append((url, product_title, product_key, "png"))
             
         return urls
     
@@ -1444,11 +1481,12 @@ class NLSAtomClient:
             sn1 = sheet_name[:3]
                         
             modified_key = product_key.replace("/feed/mtp/kiinteistorekisterikartta/ktj_kiinteistorajat", "/tilauslataus/tuotteet/kiinteistorekisterikartta/avoin/karttalehdittain/tm35fin/png/ktj_kiinteistorajat")
-    
-            url = modified_key + "/" + sn1 + "/" + sheet_name + ".tif?api_key="  + self.nls_user_key
+            url = modified_key + "/" + sn1 + "/" + sheet_name + ".pgw?api_key="  + self.nls_user_key
+            urls.append((url, product_title, product_key, "pgw"))
+            url = modified_key + "/" + sn1 + "/" + sheet_name + ".png?api_key="  + self.nls_user_key
             #QgsMessageLog.logMessage(url, 'NLSAtomClient', QgsMessageLog.INFO)
     
-            urls.append((url, product_title, product_key, "geotiff"))
+            urls.append((url, product_title, product_key, "png"))
             
         return urls
     
@@ -1555,11 +1593,8 @@ class NLSAtomClient:
         if not os.path.exists(dir_path):
             try:
                 os.makedirs(dir_path)
-            except OSError as exc: # Guard against race condition
-                if exc.errno != errno.EEXIST:
-                    raise
-                else:
-                    QgsMessageLog.logMessage(exc.errno, 'NLSAtomClient', QgsMessageLog.CRITICAL)
+            except OSError as exc:
+                QgsMessageLog.logMessage(exc.errno, 'NLSAtomClient', QgsMessageLog.CRITICAL)
         if not os.path.exists(dir_path):
             QgsMessageLog.logMessage("dir not created", 'NLSAtomClient', QgsMessageLog.CRITICAL)
 
@@ -1568,7 +1603,7 @@ class NLSAtomClient:
         with open(os.path.join(dir_path, file_name), 'wb') as f:
             f.write(r.content)
             
-        if self.addDownloadedDataAsLayer:
+        if self.addDownloadedDataAsLayer and self.layers_added_count < self.maxNumberOfLayersToAdd:
             if "zip" in file_name:
                 dir_path = os.path.join(dir_path, file_name.split('.')[0])
                 z = zipfile.ZipFile(StringIO.StringIO(r.content))
@@ -1577,31 +1612,74 @@ class NLSAtomClient:
             data_type = self.all_urls[self.download_count][3]
                 
             for listed_file_name in os.listdir(dir_path):
-                if (data_type == "shp" and listed_file_name.endswith(".shp")) or \
-                    (data_type == "gml" and listed_file_name.endswith(".xml")):
+                if self.layers_added_count >= self.maxNumberOfLayersToAdd:
+                    break
+                #QgsMessageLog.logMessage(listed_file_name, 'NLSAtomClient', QgsMessageLog.INFO)
+                if data_type == "shp" and listed_file_name.endswith(".shp"):
                     found_layer = False
                     current_layers = self.iface.legendInterface().layers()
                     for current_layer in current_layers:
-                        if current_layer.name() == "file":
+                        if current_layer.name() == listed_file_name:
                             found_layer = True
                             break
                     if not found_layer:
                         new_layer = QgsVectorLayer(os.path.join(dir_path, listed_file_name), listed_file_name, "ogr")
                         if new_layer.isValid():
                             QgsMapLayerRegistry.instance().addMapLayers([new_layer])
-                if (data_type == "png" and listed_file_name.endswith(".png")) or \
+                            self.layers_added_count += 1
+                elif data_type == "gml" and listed_file_name.endswith(".xml"):
+                    driver = ogr.GetDriverByName('GML')
+                    data_source = driver.Open(os.path.join(dir_path, listed_file_name), 0)
+                    #for layer in data_source:
+                    #    layer_name = layer.GetName()
+                    #    QgsMessageLog.logMessage("A gml layer: " + layer_name, 'NLSAtomClient', QgsMessageLog.INFO)
+                    layer_count = data_source.GetLayerCount()
+                    for i in range(layer_count):
+                        layer = data_source.GetLayerByIndex(i)
+                        layer_name = layer.GetName()
+                        #QgsMessageLog.logMessage("A gml layer: " + layer_name, 'NLSAtomClient', QgsMessageLog.INFO)
+                        new_layer_name = listed_file_name + " " + layer_name
+                        new_layer = QgsVectorLayer(os.path.join(dir_path, listed_file_name) + "|layerid=" + str(i), new_layer_name, "ogr")
+                        found_layer = False
+                        current_layers = self.iface.legendInterface().layers()
+                        for current_layer in current_layers:
+                            if current_layer.name() == new_layer_name:
+                                found_layer = True
+                                break
+                        if not found_layer:
+                            QgsMapLayerRegistry.instance().addMapLayers([new_layer])
+                            self.layers_added_count += 1
+                            
+                elif (data_type == "png" and listed_file_name.endswith(".png")) or \
                     (data_type == "geotiff" and listed_file_name.endswith(".tif")) or \
                     (data_type == "jpeg2000" and listed_file_name.endswith(".jp2")):
+                    #QgsMessageLog.logMessage("raster data type", 'NLSAtomClient', QgsMessageLog.INFO)
                     found_layer = False
                     current_layers = self.iface.legendInterface().layers()
                     for current_layer in current_layers:
-                        if current_layer.name() == "file":
+                        if current_layer.name() == listed_file_name:
                             found_layer = True
                             break
                     if not found_layer:
+                        #QgsMessageLog.logMessage("did not find the layer", 'NLSAtomClient', QgsMessageLog.INFO)
+                        s = QSettings()
+                        oldValidation = s.value( "/Projections/defaultBehaviour" )
+                        s.setValue( "/Projections/defaultBehaviour", "useProject" )
                         new_layer = QgsRasterLayer(os.path.join(dir_path, listed_file_name), listed_file_name)
                         if new_layer.isValid():
+                            #crs = QgsCoordinateReferenceSystem()
+                            #crs.createFromProj4("+proj=utm +zone=35 +ellps=GRS80 +units=m +no_defs")
+                            #if not crs.isValid():
+                            #    QgsMessageLog.logMessage("Created CRS is not valid", 'NLSAtomClient', QgsMessageLog.CRITICAL)
+                            #new_layer.setCrs( crs )
                             QgsMapLayerRegistry.instance().addMapLayers([new_layer])
+                            self.layers_added_count += 1
+                        else:
+                            QgsMessageLog.logMessage("layer is not valid", 'NLSAtomClient', QgsMessageLog.CRITICAL)
+                        s.setValue( "/Projections/defaultBehaviour", oldValidation )
+                else:
+                    pass
+                    #QgsMessageLog.logMessage("cannot add the data type " + data_type + ", listed_file_name: " + listed_file_name, 'NLSAtomClient', QgsMessageLog.INFO)
                 
             #QgsMapLayerRegistry.instance().addMapLayers([self.municipality_layer])
         
@@ -1609,14 +1687,14 @@ class NLSAtomClient:
         percentage = self.download_count / float(self.total_download_count) * 100.0
         percentage_text = "%.2f" % round(percentage, 2)
         
-        self.busy_indicator_dialog.setMessage("A moment... processed " + percentage_text + "% of the files ")
+        self.busy_indicator_dialog.setMessage(self.tr(u'A moment... processed ') + percentage_text + self.tr(u'% of the files '))
         #self.iface.messageBar().pushMessage("A moment... processed " + percentage_text + "% of files")
         QgsMessageLog.logMessage("A moment... processed " + percentage_text + "% of the files", 'NLSAtomClient', QgsMessageLog.INFO)
         
         if self.download_count == self.total_download_count:
             QgsMessageLog.logMessage("done downloading data", 'NLSAtomClient', QgsMessageLog.INFO)
             self.busy_indicator_dialog.hide()
-            self.iface.messageBar().pushMessage("Download finished", "NLS data download finished. Data located under " + self.data_download_dir, level=QgsMessageBar.SUCCESS)#, duration=10)
+            self.iface.messageBar().pushMessage(self.tr(u'Download finished'), self.tr(u'NLS data download finished. Data located under ') + self.data_download_dir, level=QgsMessageBar.SUCCESS)#, duration=10)
         else:
             QTimer.singleShot(10, self.downloadOneFile)
                 
@@ -1648,6 +1726,7 @@ class NLSAtomClient:
         self.nls_user_key_dialog.userKeyLineEdit.setText(self.nls_user_key)
         self.nls_user_key_dialog.dataLocationQgsFileWidget.setFilePath(os.path.join(self.path, "data"))
         self.nls_user_key_dialog.addDownloadedDataAsLayerCheckBox.setChecked(self.addDownloadedDataAsLayer)
+        self.nls_user_key_dialog.maxNumberOfLayersToAddSpinBox.setValue(self.maxNumberOfLayersToAdd)
         self.nls_user_key_dialog.showMunicipalitiesAsLayerCheckBox.setChecked(self.showMunicipalitiesAsLayer)
         self.nls_user_key_dialog.showUTMGridsAsLayerCheckBox.setChecked(self.showUTMGridsAsLayer)
         
@@ -1668,22 +1747,24 @@ class NLSAtomClient:
             self.nls_user_key = self.nls_user_key_dialog.userKeyLineEdit.text()
             if self.nls_user_key == "":
                 # cannot work without the key, so user needs to be notified
-                QMessageBox.critical(self.iface.mainWindow(), "User-key is needed", "Data cannot be downloaded without the NLS key") 
+                QMessageBox.critical(self.iface.mainWindow(), self.tr(u'User-key is needed'), self.tr(u'Data cannot be downloaded without the NLS key')) 
                 return
             self.data_download_dir = self.nls_user_key_dialog.dataLocationQgsFileWidget.filePath()
             self.addDownloadedDataAsLayer = self.nls_user_key_dialog.addDownloadedDataAsLayerCheckBox.isChecked()
+            self.maxNumberOfLayersToAdd = self.nls_user_key_dialog.maxNumberOfLayersToAddSpinBox.value()
             self.showMunicipalitiesAsLayer = self.nls_user_key_dialog.showMunicipalitiesAsLayerCheckBox.isChecked()
             self.showUTMGridsAsLayer = self.nls_user_key_dialog.showUTMGridsAsLayerCheckBox.isChecked()
             
             QSettings().setValue("/NLSAtomClient/userKey", self.nls_user_key)
             QSettings().setValue("/NLSAtomClient/dataDownloadDir", self.data_download_dir)
             QSettings().setValue("/NLSAtomClient/addDownloadedDataAsLayer", self.addDownloadedDataAsLayer)
+            QSettings().setValue("/NLSAtomClient/maxNumberOfLayersToAdd", self.maxNumberOfLayersToAdd)
             QSettings().setValue("/NLSAtomClient/showMunicipalitiesAsLayer", self.showMunicipalitiesAsLayer)
             QSettings().setValue("/NLSAtomClient/showUTMGridsAsLayer", self.showUTMGridsAsLayer)
         else:
             if self.nls_user_key == "":
                 # cannot work without the key, so user needs to be notified
-                QMessageBox.critical(self.iface.mainWindow(), "User-key is needed", "Data cannot be downloaded without the NLS key") 
+                QMessageBox.critical(self.iface.mainWindow(), self.tr(u'User-key is needed'), self.tr(u'Data cannot be downloaded without the NLS key')) 
                 return
 
     def initWithNLSData(self):
@@ -1691,6 +1772,11 @@ class NLSAtomClient:
         self.data_download_dir = self.path
         
         self.nls_user_key_dialog = uic.loadUi(os.path.join(self.path, NLS_USER_KEY_DIALOG_FILE))
+        
+        self.first_run = QSettings().value("/NLSAtomClient/first_run", True, type=bool)
+        
+        if self.first_run:
+            QSettings().setValue("/NLSAtomClient/first_run", False)
         
         #=======================================================================
         # first_run = False
