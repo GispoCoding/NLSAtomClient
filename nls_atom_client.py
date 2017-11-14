@@ -1592,12 +1592,13 @@ class NLSAtomClient:
         file_name = url_parts[-1].split('?')[0]
         
         dir_path = os.path.join(self.data_download_dir, self.all_urls[self.download_count][1])
+        dir_path = dir_path.replace(":", "_suhde_")
         #QgsMessageLog.logMessage(dir_path, 'NLSAtomClient', QgsMessageLog.INFO)
         if not os.path.exists(dir_path):
             try:
                 os.makedirs(dir_path)
             except OSError as exc:
-                QgsMessageLog.logMessage(exc.errno, 'NLSAtomClient', QgsMessageLog.CRITICAL)
+                QgsMessageLog.logMessage(str(exc.errno), 'NLSAtomClient', QgsMessageLog.CRITICAL)
         if not os.path.exists(dir_path):
             QgsMessageLog.logMessage("dir not created", 'NLSAtomClient', QgsMessageLog.CRITICAL)
 
@@ -1794,7 +1795,7 @@ class NLSAtomClient:
         #         if exc.errno != errno.EEXIST:
         #             raise
         #         else:
-        #             QgsMessageLog.logMessage(exc.errno, 'NLSAtomClient', QgsMessageLog.CRITICAL)
+        #             QgsMessageLog.logMessage(str(exc.errno), 'NLSAtomClient', QgsMessageLog.CRITICAL)
         # if not os.path.exists(dir_path):
         #     QgsMessageLog.logMessage("Directory " + dir_path + "could not be created", 'NLSAtomClient', QgsMessageLog.CRITICAL)
         #     
