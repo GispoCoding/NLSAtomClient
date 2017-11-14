@@ -1591,8 +1591,10 @@ class NLSAtomClient:
         url_parts = url.split('/')
         file_name = url_parts[-1].split('?')[0]
         
-        dir_path = os.path.join(self.data_download_dir, self.all_urls[self.download_count][1])
-        dir_path = dir_path.replace(":", "_suhde_")
+        data_dir_name = self.all_urls[self.download_count][1]
+        data_dir_name = data_dir_name.replace(":", "_suhde_")
+        dir_path = os.path.join(self.data_download_dir, data_dir_name)
+        
         #QgsMessageLog.logMessage(dir_path, 'NLSAtomClient', QgsMessageLog.INFO)
         if not os.path.exists(dir_path):
             try:
