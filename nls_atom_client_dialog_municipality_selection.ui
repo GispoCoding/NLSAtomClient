@@ -42,14 +42,14 @@
     <item>
      <widget class="QLabel" name="label">
       <property name="text">
-       <string>Choose municipalities to download data from:</string>
+       <string>Choose municipality to download data from:</string>
       </property>
      </widget>
     </item>
     <item>
      <widget class="QListWidget" name="municipalityListWidget">
       <property name="selectionMode">
-       <enum>QAbstractItemView::MultiSelection</enum>
+       <enum>QAbstractItemView::SingleSelection</enum>
       </property>
       <property name="sortingEnabled">
        <bool>true</bool>

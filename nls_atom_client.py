@@ -243,7 +243,6 @@ class NLSAtomClient:
             self.iface.messageBar().pushMessage("Error", "Failed to load the municipality layer", level=QgsMessageBar.CRITICAL, duration=5)
             return
         self.municipality_layer.setProviderEncoding('ISO-8859-1')
-        
         self.utm5_layer = QgsVectorLayer(os.path.join(self.path, "data/utm5.shp"), "utm5", "ogr")
         if not self.utm5_layer.isValid():
             QgsMessageLog.logMessage('Failed to load the UTM 5 grid layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
@@ -335,8 +334,10 @@ class NLSAtomClient:
         for feature in iter:
             self.municipalities_dialog.municipalityListWidget.addItem(feature['NAMEFIN'])
         
-        for key, value in self.product_types.items():           
-            self.municipalities_dialog.productListWidget.addItem(value)
+        for key, value in self.product_types.items():
+            # Downloading lidar and orto products too slow, so they are not included now
+            if key != 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000' and key != 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva' and key != 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/ortokuva':
+                self.municipalities_dialog.productListWidget.addItem(value)
 
         self.municipalities_dialog.show()
         
@@ -375,9 +376,8 @@ class NLSAtomClient:
                 QCoreApplication.processEvents()
                 
                 for selected_mun_name in selected_mun_names:
-                    if 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000' in product_types or \
-                        'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva' in product_types or \
-                        'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/ortokuva' in product_types:
+                    if 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/laser/etrs-tm35fin-n2000' in product_types or 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/vaaravari_ortokuva' in product_types or 'https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/orto/ortokuva' in product_types:
+                        #QgsMessageLog.logMessage("Calling getMunicipalityIntersectingFeatures with utm5", 'NLSAtomClient', QgsMessageLog.INFO)
                         self.mun_utm5_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm5_layer)
                     self.mun_utm10_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm10_layer)
                     self.mun_utm25lr_features = self.getMunicipalityIntersectingFeatures(selected_mun_name, self.utm25lr_layer)
@@ -391,10 +391,11 @@ class NLSAtomClient:
     def getMunicipalityIntersectingFeatures(self, selected_mun_name, layer):
         intersecting_features = []
         request = QgsFeatureRequest().setFilterExpression( u'"NAMEFIN" = \'' + selected_mun_name + u'\'' )
-        #QgsMessageLog.logMessage(municipality_layer.featureCount(request), 'NLSAtomClient', QgsMessageLog.INFO)
+        #QgsMessageLog.logMessage("in getMunicipalityIntersectingFeatures", 'NLSAtomClient', QgsMessageLog.INFO)
         iter = self.municipality_layer.getFeatures( request )
         count = 0
         for feature in iter:
+            #QgsMessageLog.logMessage(str(count), 'NLSAtomClient', QgsMessageLog.INFO)
             count += 1
             mun_geom = feature.geometry()
             
@@ -412,6 +413,8 @@ class NLSAtomClient:
     def downloadData(self, product_types):
         # TODO show progress to the user
         # TODO show extracted data as layers in the QGIS if preferred by the user
+        
+        QgsMessageLog.logMessage("in downloadData", 'NLSAtomClient', QgsMessageLog.INFO)
         
         self.all_urls = []
         self.total_download_count = 0

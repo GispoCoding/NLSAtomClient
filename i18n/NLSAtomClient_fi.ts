@@ -10,8 +10,8 @@
     </message>
     <message>
         <location filename="../nls_atom_client_dialog_municipality_selection.ui" line="45"/>
-        <source>Choose municipalities to download data from:</source>
-        <translation>Valitse kunnat, joiden aineistoja ladataan:</translation>
+        <source>Choose municipality to download data from:</source>
+        <translation>Valitse kunta, jonka aineistoja ladataan:</translation>
     </message>
     <message>
         <location filename="../nls_atom_client_dialog_municipality_selection.ui" line="74"/>
@@ -82,37 +82,37 @@
         <translation>&amp;Lataa MML:n aineistoja</translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="373"/>
+        <location filename="../nls_atom_client.py" line="374"/>
         <source>A moment... processed 0% of the files </source>
         <translation>Pieni hetki... 0% aineistoista ladattu  </translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1693"/>
+        <location filename="../nls_atom_client.py" line="1696"/>
         <source>A moment... processed </source>
         <translation>Pieni hetki...</translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1693"/>
+        <location filename="../nls_atom_client.py" line="1696"/>
         <source>% of the files </source>
         <translation>% aineistoista ladattu </translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1700"/>
+        <location filename="../nls_atom_client.py" line="1703"/>
         <source>Download finished</source>
         <translation>Aineistojen lataus valmis</translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1700"/>
+        <location filename="../nls_atom_client.py" line="1703"/>
         <source>NLS data download finished. Data located under </source>
         <translation>MML-aineistojen lataus valmis. Aineisto tallennettu kansioon </translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1770"/>
+        <location filename="../nls_atom_client.py" line="1773"/>
         <source>User-key is needed</source>
         <translation>Käyttäjäkohtainen tunnisteavain tarvitaan</translation>
     </message>
     <message>
-        <location filename="../nls_atom_client.py" line="1770"/>
+        <location filename="../nls_atom_client.py" line="1773"/>
         <source>Data cannot be downloaded without the NLS key</source>
         <translation>MML:n aineistoja ei voida ladata ilman MML:n käyttäjäkohtaista tunnisteavainta</translation>
     </message>
