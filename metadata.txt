@@ -10,25 +10,25 @@
 name=NLS Data Downloader
 qgisMinimumVersion=2.3
 description=This plugin makes possible to download NLS.fi open data
-version=0.1
+version=0.2
 author=Gispo
 email=erno@gispo.fi
 
 about=This plugin makes possible to download data NLS.fi open data (CC-BY 4.0), such as, topographic data based on municipal regions. It utilizes the NLS Open data file updating service (Atom feed), . You need to order a user-specific identification key from NLS to be able to use this plugin: http://www.maanmittauslaitos.fi/en/e-services/open-data-file-download-service/open-data-file-updating-service-interface.
 
-tracker=https://github.com/ernogispo/NLSAtomClient/issues
-repository=https://github.com/ernogispo/NLSAtomClient
+tracker=https://github.com/GispoCoding/NLSAtomClient/issues
+repository=https://github.com/GispoCoding/NLSAtomClient
 # End of mandatory metadata
 
 # Recommended items:
 
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=2017-12-17 - Added possibility to select individual layers from the topographic database and changed the homepage for the plugin
 
 # Tags are comma separated with spaces allowed
 tags=import, open data, Finland
 
-homepage=https://github.com/ernogispo/NLSAtomClient
+homepage=https://github.com/GispoCoding/NLSAtomClient
 category=Plugins
 icon=icon.png
 # experimental flag

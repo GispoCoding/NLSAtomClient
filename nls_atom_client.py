@@ -50,6 +50,32 @@ from osgeo import ogr
 NLS_USER_KEY_DIALOG_FILE = "nls_atom_client_dialog_NLS_user_key.ui"
 MUNICIPALITIES_DIALOG_FILE = "nls_atom_client_dialog_municipality_selection.ui"
 
+MTK_ALL_PRODCUCTS_URL = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/feed/mtp/maastotietokanta/kaikki"
+MTK_ALL_PRODCUCTS_DOWNLOAD_URL = "https://tiedostopalvelu.maanmittauslaitos.fi/tp/tilauslataus/tuotteet/maastotietokanta/kaikki"
+MTK_LAYERS_KEY_PREFIX = "MTK"
+MTK_ALL_PRODUCTS_TITLE = "Maastotietokanta, kaikki kohteet"
+MTK_PRODUCT_NAMES_PREFIX = "Maastotietokanta, "
+MTK_PRODUCT_NAMES = ["YhteisetTyypit", "Aallonmurtaja", "AidanSymboli", "Aita", "Allas", "AluemerenUlkoraja", "AmpumaAlue",
+                     "Ankkuripaikka", "Autoliikennealue", "HarvaLouhikko", "Hautausmaa", "Hietikko", "Hylky", "HylynSyvyys",
+                     "IlmaradanKannatinpylvas", "Ilmarata", "Jyrkanne", "Kaatopaikka", "Kaislikko", "KallioAlue", "KallioSymboli",
+                     "Kalliohalkeama", "Kansallispuisto", "Karttasymboli", "Kellotapuli", "Kivi", "Kivikko", "Korkeuskayra",
+                     "KorkeuskayranKorkeusarvo", "Koski", "KunnanHallintokeskus", "KunnanHallintoraja", "Kunta", "Lahde",
+                     "Lahestymisvalo", "Lentokenttaalue", "Louhos", "Luiska", "Luonnonpuisto", "Luonnonsuojelualue",
+                     "MaaAineksenottoalue", "Maasto2kuvionReuna", "MaastokuvionReuna", "Maatalousmaa", "MaatuvaVesialue",
+                     "Masto", "MastonKorkeus", "Matalikko", "MerkittavaLuontokohde", "MetsamaanKasvillisuus", "MetsamaanMuokkaus",
+                     "MetsanRaja", "Muistomerkki", "Muuntaja", "Muuntoasema", "Nakotorni", "Niitty", "Osoitepiste", "Paikannimi",
+                     "Pato", "Pelastuskoodipiste", "PistolaituriViiva", "Portti", "Puisto", "PutkijohdonSymboli", "Putkijohto",
+                     "Puu", "Puurivi", "RajavyohykkeenTakaraja", "Rakennelma", "Rakennus", "Rakennusreunaviiva", "Rautatie",
+                     "Rautatieliikennepaikka", "RautatienSymboli", "Retkeilyalue", "Sahkolinja", "SahkolinjanSymboli", "Savupiippu",
+                     "SavupiipunKorkeus", "Selite", "SisaistenAluevesienUlkoraja", "Soistuma", "Sulkuportti", "Suo", "SuojaAlue",
+                     "SuojaAlueenReunaviiva", "Suojametsa", "Suojanne", "SuojelualueenReunaviiva", "SuurjannitelinjanPylvas",
+                     "Syvyyskayra", "SyvyyskayranSyvyysarvo", "Syvyyspiste", "TaajaanRakennettuAlue", "TaajaanRakennetunAlueenReuna",
+                     "Taytemaa", "Tervahauta", "Tiesymboli", "Tienroteksti", "Tieviiva", "Tulentekopaikka", "TulvaAlue",
+                     "TunnelinAukko", "Turvalaite", "Tuulivoimala", "Uittolaite", "Uittoranni", "UlkoJaSisasaaristonRaja",
+                     "UrheiluJaVirkistysalue", "ValtakunnanRajapyykki", "Varastoalue", "Vedenottamo", "VedenpinnanKorkeusluku",
+                     "Vesiasteikko", "Vesikivi", "Vesikivikko", "Vesikulkuvayla", "VesikulkuvaylanKulkusuunta", "VesikulkuvaylanTeksti",
+                     "Vesikuoppa", "Vesitorni", "Viettoviiva", "Virtausnuoli", "VirtavesiKapea", "VirtavesiAlue"]
+
 class NLSAtomClient:
     """QGIS Plugin Implementation."""
 
@@ -363,12 +389,19 @@ class NLSAtomClient:
             
             product_types = {} # TODO ask from the user via dialog that lists types based on NLS Atom service  
 
+            self.selected_mtk_product_types = []
+
             for selected_prod_title in self.municipalities_dialog.productListWidget.selectedItems():
                 for key, value in self.product_types.items():
                     if selected_prod_title.text() == value:
-                        product_types[key] = value
+                        if key.startswith(MTK_LAYERS_KEY_PREFIX): # Individual MTK layer
+                            self.selected_mtk_product_types.append(selected_prod_title.text()[len(MTK_PRODUCT_NAMES_PREFIX):])
+                            product_types[MTK_ALL_PRODCUCTS_URL] = MTK_ALL_PRODUCTS_TITLE
+                        else:
+                            product_types[key] = value
                     
             QgsMessageLog.logMessage(str(product_types), 'NLSAtomClient', QgsMessageLog.INFO)
+            QgsMessageLog.logMessage(str(self.selected_mtk_product_types), 'NLSAtomClient', QgsMessageLog.INFO)
             
             if len(selected_mun_names) > 0 and len(product_types) > 0:
                 self.busy_indicator_dialog = QgsBusyIndicatorDialog(self.tr(u'A moment... processed 0% of the files '), self.iface.mainWindow())
@@ -1640,12 +1673,15 @@ class NLSAtomClient:
                     #    layer_name = layer.GetName()
                     #    QgsMessageLog.logMessage("A gml layer: " + layer_name, 'NLSAtomClient', QgsMessageLog.INFO)
                     layer_count = data_source.GetLayerCount()
+                    
+                    mtk_layer_count = 0 # Used for breaking from the for loop when all MTK layers chosen by the user have been added
+                                        
                     for i in range(layer_count):
                         layer = data_source.GetLayerByIndex(i)
                         layer_name = layer.GetName()
                         #QgsMessageLog.logMessage("A gml layer: " + layer_name, 'NLSAtomClient', QgsMessageLog.INFO)
                         new_layer_name = listed_file_name + " " + layer_name
-                        new_layer = QgsVectorLayer(os.path.join(dir_path, listed_file_name) + "|layerid=" + str(i), new_layer_name, "ogr")
+
                         found_layer = False
                         current_layers = self.iface.legendInterface().layers()
                         for current_layer in current_layers:
@@ -1653,8 +1689,25 @@ class NLSAtomClient:
                                 found_layer = True
                                 break
                         if not found_layer:
-                            QgsMapLayerRegistry.instance().addMapLayers([new_layer])
-                            self.layers_added_count += 1
+                            # check if the downloaded file contains the Maastotietokanta layers and if it does, then add only layers selected by the user
+                            if url.startswith(MTK_ALL_PRODCUCTS_DOWNLOAD_URL):
+                                for product_type in self.selected_mtk_product_types:
+                                    if product_type == layer_name:
+                                        new_layer = QgsVectorLayer(os.path.join(dir_path, listed_file_name) + "|layerid=" + str(i), new_layer_name, "ogr")
+                                        if new_layer.isValid():
+                                            QgsMapLayerRegistry.instance().addMapLayers([new_layer])
+                                            self.layers_added_count += 1
+                                            mtk_layer_count += 1
+                                        break
+                            else:
+                                new_layer = QgsVectorLayer(os.path.join(dir_path, listed_file_name) + "|layerid=" + str(i), new_layer_name, "ogr")
+                                if new_layer.isValid():
+                                    QgsMapLayerRegistry.instance().addMapLayers([new_layer])
+                                    self.layers_added_count += 1
+                                
+                        if (url.startswith(MTK_ALL_PRODCUCTS_DOWNLOAD_URL) and mtk_layer_count == len(self.selected_mtk_product_types)) or \
+                            (self.layers_added_count >= self.maxNumberOfLayersToAdd):
+                            break
                             
                 elif (data_type == "png" and listed_file_name.endswith(".png")) or \
                     (data_type == "geotiff" and listed_file_name.endswith(".tif")) or \
@@ -1724,7 +1777,13 @@ class NLSAtomClient:
             QgsMessageLog.logMessage(title.text, 'NLSAtomClient', QgsMessageLog.INFO)
             id = entry.find('{http://www.w3.org/2005/Atom}id')
             QgsMessageLog.logMessage(id.text, 'NLSAtomClient', QgsMessageLog.INFO)
-            products[id.text] = title.text
+            
+            if title.text == 'Maastotietokanta, kaikki kohteet':
+                # TODO let user choose in the options dialog if the individual layers can be selected
+                for mtk_product_name in MTK_PRODUCT_NAMES:
+                    products[MTK_LAYERS_KEY_PREFIX + mtk_product_name] = MTK_PRODUCT_NAMES_PREFIX + mtk_product_name
+            else:
+                products[id.text] = title.text
 
         return products
 
