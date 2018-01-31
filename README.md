@@ -25,6 +25,6 @@ Lisäosan ajo onnistuu Laajennusosat-valikosta: Laajennusosat | MML-aineistonlat
 
 Aineistot haetaan MML:n muutostietopalvelusta, jossa ne on riippuen aineistosta jaoteltu erikokoisten UTM-lehtien mukaan kuten MML:n tiedostopalvelussa. Lisäosa hakee sellaisten lehtien mukaiset aineistot, jotka leikkaavat kunnan geometriaa. Kuntajako perustuu 31.1.2018 MML:n muunnostietopalvelussaan tarjoamaan 1:10 000 -kuntajakoaineistoon.
 
-Mikäli MML:n API-avaimen haluaa jostakin syystä poistaa, sen voi tehdä QGIS:n Asetukset | Valinnat | Edistyneet piirteet | NLSAtomClient | userKey -kohdasta.
+Mikäli MML:n API-avaimen haluaa jostakin syystä poistaa lisäosalta, sen voi tehdä QGIS:n Asetukset | Valinnat | Edistyneet piirteet | NLSAtomClient | userKey -kohdasta.
 
 
