@@ -263,7 +263,7 @@ class NLSAtomClient:
         
         self.product_types = self.downloadNLSProductTypes()
 
-        self.municipality_layer = QgsVectorLayer(os.path.join(self.path, "data/SuomenKuntajako_2017_10k.shp"), "municipalities", "ogr")
+        self.municipality_layer = QgsVectorLayer(os.path.join(self.path, "data/SuomenKuntajako_2018_10k.shp"), "municipalities", "ogr")
         if not self.municipality_layer.isValid():
             QgsMessageLog.logMessage('Failed to load the municipality layer', 'NLSAtomClient', QgsMessageLog.CRITICAL)
             self.iface.messageBar().pushMessage("Error", "Failed to load the municipality layer", level=QgsMessageBar.CRITICAL, duration=5)

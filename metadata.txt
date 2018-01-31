@@ -10,7 +10,7 @@
 name=NLS Data Downloader
 qgisMinimumVersion=2.3
 description=This plugin makes possible to download NLS.fi open data
-version=0.2
+version=0.3
 author=Gispo
 email=erno@gispo.fi
 
