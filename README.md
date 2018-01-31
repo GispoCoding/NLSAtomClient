@@ -23,7 +23,7 @@ Pythonin [requests kirjasto](http://docs.python-requests.org/) tulee olla asenne
 
 Lisäosan ajo onnistuu Laajennusosat-valikosta: Laajennusosat | MML-aineistonlataustyökalu | Lataa MML:n aineistoja. Kun lisäosan ajaa ensimmäisen kerran, avautuu dialogi, jossa täytyy antaa MML:n muunnostietopalvelun tunnisteavain. Muita asetuksia voi halutessaan muokata nyt tai myöhemminkin. Ko. dialogin OK-painikkeen napautuksen jälkeen aukeaa toinen dialogi, jossa voi valita kunnan ja yhden tai useampia aineistoja (maastotietokannasta voi valita haluamansa aineistot, kun taas laserkeilausaineisto ja ortokuvat eivät ole listassa), jotka haetaan ja riippuen valituista asetuksista lisätään tasoina QGIS:iin tai ainoastaan tallenetaan levylle, kun painaa OK-painiketta.
 
-Aineistot haetaan MML:n muutostietopalvelusta, jossa ne on riippuen aineistosta jaoteltu erikokoisten UTM-lehtien mukaan kuten MML:n tiedostopalvelussa. Lisäosa hakee sellaisten lehtien mukaiset aineistot, jotka leikkaavat kunnan geometriaa. Kuntalehtijako perustuu 31.1.2018 MML:n tarjoamaan 1:10 000 -kuntajakoaineistoon.
+Aineistot haetaan MML:n muutostietopalvelusta, jossa ne on riippuen aineistosta jaoteltu erikokoisten UTM-lehtien mukaan kuten MML:n tiedostopalvelussa. Lisäosa hakee sellaisten lehtien mukaiset aineistot, jotka leikkaavat kunnan geometriaa. Kuntajako perustuu 31.1.2018 MML:n muunnostietopalvelussaan tarjoamaan 1:10 000 -kuntajakoaineistoon.
 
 Mikäli MML:n API-avaimen haluaa jostakin syystä poistaa, sen voi tehdä QGIS:n Asetukset | Valinnat | Edistyneet piirteet | NLSAtomClient | userKey -kohdasta.
 
