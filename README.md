@@ -7,7 +7,7 @@ Finnish instructions for use below.
 
 ## Asennusohjeet
 
-Lisäosa on vielä varhaista beta-laatua (esim. virhetilanteiden varalta ei ole käsittelyä) mutta sen voi kuitenkin asentaa ja kokeilla QGIS 2.x versioilla. Palaute on tervetullutta: erno@gispo.fi
+Lisäosa on vielä varhaista beta-laatua (esim. virhetilanteiden varalta ei ole käsittelyä) mutta sen voi kuitenkin asentaa ja kokeilla QGIS 2.x versioilla. Palaute on tervetullutta: info@gispo.fi
 
 Pythonin [requests kirjasto](http://docs.python-requests.org/) tulee olla asennettuna. Tarvittaessa sen voi asentaa komentoriviltä komennolla:
 
